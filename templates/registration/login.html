@@ -1,0 +1,9 @@
+{# Login-Seite. Django sucht dieses Template automatisch unter registration/login.html. #}
+{% extends "base.html" %}
+{% block title %}Login – Ämtli{% endblock %}
+{% block content %}
+<h1>Login</h1>
+{# form.as_p gibt alle Felder (Benutzername, Passwort) inkl. Fehlermeldungen als Absätze aus #}
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Einloggen</button></form>
+<p>Noch kein Konto? <a href="{% url 'register' %}">Registrieren</a></p>
+{% endblock %}

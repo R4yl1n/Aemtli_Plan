@@ -1,0 +1,37 @@
+{# Grundlayout für alle Seiten. Andere Templates "erben" davon mit {% extends "base.html" %} #}
+{# und füllen nur die Blöcke "title" und "content". #}
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">                                                    {# Umlaute korrekt darstellen #}
+  <meta name="viewport" content="width=device-width, initial-scale=1">    {# Auf dem Handy richtig skalieren #}
+  <title>{% block title %}Ämtli{% endblock %}</title>                      {# Seitentitel, kann pro Seite überschrieben werden #}
+  <style>
+    /* Einfaches Grund-Styling, bis das Frontend festgelegt ist */
+    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 0 auto; padding: 1rem; }  /* Inhalt zentriert, schmale Spalte */
+    nav { display: flex; gap: 1rem; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: .5rem; margin-bottom: 1rem; }  /* Navigationsleiste oben */
+    nav form { display: inline; margin-left: auto; }                         /* Logout-Button ganz rechts */
+    .messages li { background: #eef; padding: .4rem .6rem; margin: .3rem 0; list-style: none; }  /* Meldungen hervorheben */
+    .errorlist { color: #b00; }                                              /* Formularfehler rot */
+    table { border-collapse: collapse; width: 100%; }                        /* Tabellen volle Breite */
+    td, th { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid #eee; }  /* Tabellenzellen */
+  </style>
+</head>
+<body>
+  <nav>
+    <strong><a href="/">Ämtli</a></strong>                                   {# Logo/Link zur Startseite #}
+    {% if user.is_authenticated %}                                          {# Eingeloggt: #}
+      <a href="{% url 'wg_detail' %}">Meine WG</a>                           {# Link zur eigenen WG #}
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}       {# Logout muss per POST erfolgen; csrf_token schützt vor fremden Formularen #}
+        <span>{{ user.username }}</span> <button type="submit">Logout</button>
+      </form>
+    {% else %}                                                              {# Nicht eingeloggt: #}
+      <a href="{% url 'login' %}">Login</a>
+      <a href="{% url 'register' %}">Registrieren</a>
+    {% endif %}
+  </nav>
+  {# Meldungen aus messages.success(...) / messages.error(...) in den Views anzeigen #}
+  {% if messages %}<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% block content %}{% endblock %}                                         {# Hier kommt der Inhalt der jeweiligen Seite hin #}
+</body>
+</html>

@@ -37,10 +37,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'accounts',
-    'wg',
-    'aemtli',
-    'finanzen',
+    'accounts',    # Eigene App: Registrierung, Login, Logout
+    'wg',          # Eigene App: WG, Mitgliedschaften, Einladungscode (F1)
+    'aemtli',      # Eigene App: Ämtliplan mit Rotation (F2)
+    'finanzen',    # Eigene App: Ausgaben und Saldo (F3)
 ]
 
 MIDDLEWARE = [
@@ -131,6 +131,7 @@ MAILERS = {
     },
 }
 
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = 'login'
+# Login-Einstellungen
+LOGIN_URL = 'login'              # Hierhin werden nicht eingeloggte Benutzer geschickt
+LOGIN_REDIRECT_URL = '/'         # Nach dem Login zur Startseite
+LOGOUT_REDIRECT_URL = 'login'    # Nach dem Logout zurück zur Login-Seite

@@ -1,0 +1,30 @@
+{# Übersicht der eigenen WG (wg.views.wg_detail): Einladungscode und Mitgliederliste. #}
+{# Verwaltungs-Buttons sehen nur Admins (ist_admin). Die Views prüfen das zusätzlich. #}
+{% extends "base.html" %}
+{% block title %}{{ wg.name }} – Ämtli{% endblock %}
+{% block content %}
+<h1>{{ wg.name }}</h1>
+<p>Einladungscode: <code>{{ wg.einladungscode }}</code></p>  {# Diesen Code an neue Mitbewohner weitergeben #}
+{% if ist_admin %}
+{# Neuen Code erzeugen, z.B. wenn der alte an die falsche Person ging #}
+<form method="post" action="{% url 'code_erneuern' %}">{% csrf_token %}<button type="submit">Code erneuern</button></form>
+{% endif %}
+
+<h2>Mitglieder</h2>
+<table>
+  <tr><th>Name</th><th>Rolle</th>{% if ist_admin %}<th></th>{% endif %}</tr>
+  {% for m in mitgliedschaften %}                    {# Eine Zeile pro Mitbewohner #}
+  <tr>
+    <td>{{ m.user.username }}</td>
+    <td>{{ m.get_rolle_display }}</td>               {# Zeigt "Admin" bzw. "Mitglied" statt des DB-Werts #}
+    {% if ist_admin %}
+    <td>
+      {# m.pk = ID der Mitgliedschaft, damit die View weiss, wer gemeint ist #}
+      <form method="post" action="{% url 'rolle_wechseln' m.pk %}" style="display:inline">{% csrf_token %}<button type="submit">Rolle wechseln</button></form>
+      <form method="post" action="{% url 'mitglied_entfernen' m.pk %}" style="display:inline">{% csrf_token %}<button type="submit">Entfernen</button></form>
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

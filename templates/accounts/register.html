@@ -1,0 +1,8 @@
+{# Registrierungsseite, wird von accounts.views.register angezeigt. #}
+{% extends "base.html" %}
+{% block title %}Registrieren – Ämtli{% endblock %}
+{% block content %}
+<h1>Registrieren</h1>
+{# Formular: Benutzername, Passwort, Passwort wiederholen #}
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Konto erstellen</button></form>
+{% endblock %}
