@@ -114,6 +114,43 @@ def rolle_wechseln(request, pk):
     return redirect("wg_detail")                          # Zurück zur WG-Übersicht
 
 
+@nur_wg_mitglied
+def wg_verlassen(request):
+    """Mitglied verlässt die WG selbst. GET zeigt eine Bestätigungsseite, POST führt den Austritt aus."""
+    m = request.mitgliedschaft                            # Eigene Mitgliedschaft (gesetzt von @nur_wg_mitglied)
+    allein = request.wg.mitgliedschaften.count() == 1     # True, wenn niemand sonst mehr in der WG ist
+    if not allein and _letzter_admin(m):                  # Einziger Admin, aber es gibt noch andere Mitglieder?
+        messages.error(request, "Gib zuerst einer anderen Person die Admin-Rolle, bevor du die WG verlässt.")
+        return redirect("wg_detail")                      # Zurück, ohne etwas zu ändern
+    if request.method != "POST":                          # Seite nur aufgerufen (GET)
+        return render(request, "wg/verlassen.html", {     # -> Bestätigungsseite anzeigen
+            "wg": request.wg,
+            "allein": allein,                             # Steuert den Hinweis "die WG wird gelöscht"
+        })
+    name = request.wg.name                                # Name merken, bevor die Daten weg sind
+    if allein:                                            # Letzte Person geht?
+        request.wg.delete()                               # -> ganze WG löschen (Mitgliedschaften werden mitgelöscht)
+        messages.success(request, f"Du hast «{name}» verlassen. Die WG wurde gelöscht, weil niemand mehr darin war.")
+    else:
+        m.delete()                                        # Nur die eigene Mitgliedschaft löschen, das Konto bleibt
+        messages.success(request, f"Du hast «{name}» verlassen.")
+    return redirect("wg_start")                           # Weiter zu "WG gründen oder beitreten"
+
+
+@nur_wg_admin
+def wg_loeschen(request):
+    """Admin löscht die ganze WG. GET zeigt eine Bestätigungsseite, POST löscht."""
+    if request.method != "POST":                          # Seite nur aufgerufen (GET)
+        return render(request, "wg/loeschen.html", {      # -> Bestätigungsseite anzeigen
+            "wg": request.wg,
+            "anzahl": request.wg.mitgliedschaften.count(),  # Wie viele Personen betroffen sind
+        })
+    name = request.wg.name                                # Name merken, bevor die Daten weg sind
+    request.wg.delete()                                   # WG löschen; alle Mitgliedschaften werden mitgelöscht, Konten bleiben
+    messages.success(request, f"Die WG «{name}» wurde gelöscht.")
+    return redirect("wg_start")                           # Weiter zu "WG gründen oder beitreten"
+
+
 @nur_wg_admin
 @require_POST
 def code_erneuern(request):

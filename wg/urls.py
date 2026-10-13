@@ -14,4 +14,6 @@ urlpatterns = [
     path("wg/mitglied/<int:pk>/entfernen/", views.mitglied_entfernen, name="mitglied_entfernen"),  # Mitglied entfernen (pk = ID der Mitgliedschaft)
     path("wg/mitglied/<int:pk>/rolle/", views.rolle_wechseln, name="rolle_wechseln"),              # Rolle wechseln
     path("wg/code-erneuern/", views.code_erneuern, name="code_erneuern"),    # Neuen Einladungscode erzeugen
+    path("wg/verlassen/", views.wg_verlassen, name="wg_verlassen"),          # Selbst austreten (mit Bestätigung)
+    path("wg/loeschen/", views.wg_loeschen, name="wg_loeschen"),             # Ganze WG löschen, nur Admin (mit Bestätigung)
 ]

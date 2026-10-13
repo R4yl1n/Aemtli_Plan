@@ -159,3 +159,93 @@ class VerwaltungTests(TestCase):
         self.client.force_login(self.marco)
         r = self.client.get(reverse("wg_detail"))         # WG-Seite als Marco öffnen
         self.assertContains(r, "lena")                    # Lena steht in der Liste
+
+
+class VerlassenTests(TestCase):
+    """US-F1-06: Ein Mitglied verlässt die WG selbst."""
+
+    def setUp(self):
+        """WG mit Lena (Admin) und Marco (Mitglied)."""
+        self.wg = WG.objects.create(name="WG")
+        self.lena = make_user("lena")
+        self.marco = make_user("marco")
+        self.ml = Mitgliedschaft.objects.create(user=self.lena, wg=self.wg, rolle=Mitgliedschaft.ADMIN)  # Lenas Mitgliedschaft
+        self.mm = Mitgliedschaft.objects.create(user=self.marco, wg=self.wg)                            # Marcos Mitgliedschaft
+
+    def test_mitglied_verlaesst_wg(self):
+        """Nach dem Verlassen ist Marco kein Mitglied mehr und landet auf "WG gründen oder beitreten"."""
+        self.client.force_login(self.marco)
+        r = self.client.post(reverse("wg_verlassen"))     # Austritt bestätigen
+        self.assertRedirects(r, reverse("wg_start"))      # Weiter zur Startseite ohne WG
+        self.assertFalse(Mitgliedschaft.objects.filter(user=self.marco).exists())  # Marco ist nicht mehr Mitglied
+        self.assertTrue(WG.objects.filter(pk=self.wg.pk).exists())                 # Die WG gibt es weiterhin
+
+    def test_verlassen_braucht_bestaetigung(self):
+        """Das blosse Aufrufen der Seite (ohne Bestätigen) ändert nichts."""
+        self.client.force_login(self.marco)
+        r = self.client.get(reverse("wg_verlassen"))      # Nur die Bestätigungsseite öffnen
+        self.assertEqual(r.status_code, 200)              # Seite wird angezeigt
+        self.assertTrue(Mitgliedschaft.objects.filter(user=self.marco).exists())  # Marco ist noch Mitglied
+
+    def test_einziger_admin_kann_nicht_verlassen(self):
+        """Lena ist einzige Admin und Marco ist noch da: Sie muss zuerst die Admin-Rolle weitergeben."""
+        self.client.force_login(self.lena)
+        self.client.post(reverse("wg_verlassen"))         # Austritt versuchen
+        self.assertTrue(Mitgliedschaft.objects.filter(pk=self.ml.pk).exists())  # Lena ist weiterhin Mitglied
+
+    def test_admin_kann_nach_rollenweitergabe_verlassen(self):
+        """Gibt es einen zweiten Admin, darf Lena gehen."""
+        self.mm.rolle = Mitgliedschaft.ADMIN              # Marco zum Admin machen
+        self.mm.save()
+        self.client.force_login(self.lena)
+        self.client.post(reverse("wg_verlassen"))         # Austritt
+        self.assertFalse(Mitgliedschaft.objects.filter(pk=self.ml.pk).exists())  # Lena ist weg
+
+    def test_letzte_person_loescht_wg(self):
+        """Verlässt die letzte Person die WG, wird die WG gelöscht."""
+        self.mm.delete()                                  # Marco ist schon weg, Lena ist allein
+        self.client.force_login(self.lena)
+        self.client.post(reverse("wg_verlassen"))         # Austritt
+        self.assertFalse(WG.objects.filter(pk=self.wg.pk).exists())  # WG existiert nicht mehr
+
+    def test_nach_verlassen_neu_beitreten(self):
+        """Wer gegangen ist, kann mit einem Code wieder einer WG beitreten."""
+        self.client.force_login(self.marco)
+        self.client.post(reverse("wg_verlassen"))         # Austritt
+        self.client.post(reverse("wg_beitreten"), {"code": self.wg.einladungscode})  # Wieder beitreten
+        self.assertTrue(Mitgliedschaft.objects.filter(user=self.marco, wg=self.wg).exists())  # Marco ist wieder dabei
+
+
+class LoeschenTests(TestCase):
+    """US-F1-08: Ein Admin löscht die ganze WG."""
+
+    def setUp(self):
+        """WG mit Lena (Admin) und Marco (Mitglied)."""
+        self.wg = WG.objects.create(name="WG")
+        self.lena = make_user("lena")
+        self.marco = make_user("marco")
+        Mitgliedschaft.objects.create(user=self.lena, wg=self.wg, rolle=Mitgliedschaft.ADMIN)
+        Mitgliedschaft.objects.create(user=self.marco, wg=self.wg)
+
+    def test_admin_loescht_wg(self):
+        """Nach dem Löschen gibt es weder die WG noch Mitgliedschaften, die Konten bleiben aber bestehen."""
+        self.client.force_login(self.lena)
+        r = self.client.post(reverse("wg_loeschen"))      # Löschen bestätigen
+        self.assertRedirects(r, reverse("wg_start"))      # Weiter zur Startseite ohne WG
+        self.assertFalse(WG.objects.exists())             # WG ist weg
+        self.assertFalse(Mitgliedschaft.objects.exists()) # Alle Mitgliedschaften sind weg
+        self.assertTrue(User.objects.filter(username="marco").exists())  # Marcos Konto existiert noch
+
+    def test_loeschen_braucht_bestaetigung(self):
+        """Das blosse Aufrufen der Seite (ohne Bestätigen) löscht nichts."""
+        self.client.force_login(self.lena)
+        r = self.client.get(reverse("wg_loeschen"))       # Nur die Bestätigungsseite öffnen
+        self.assertEqual(r.status_code, 200)              # Seite wird angezeigt
+        self.assertTrue(WG.objects.exists())              # WG gibt es noch
+
+    def test_mitglied_darf_nicht_loeschen(self):
+        """Ein normales Mitglied darf die WG nicht löschen."""
+        self.client.force_login(self.marco)
+        r = self.client.post(reverse("wg_loeschen"))      # Marco versucht zu löschen
+        self.assertEqual(r.status_code, 403)              # 403 = Verboten
+        self.assertTrue(WG.objects.exists())              # WG gibt es noch

@@ -37,4 +37,12 @@
     {% endfor %}
   </ul>
 </div>
+
+{# Aktionen, die sich nicht rückgängig machen lassen. Beide Links führen zuerst auf eine Bestätigungsseite. #}
+<div class="d-flex flex-wrap gap-2 mt-4">
+  <a class="btn btn-outline-danger" href="{% url 'wg_verlassen' %}">WG verlassen</a>          {# Für alle Mitglieder #}
+  {% if ist_admin %}
+  <a class="btn btn-danger" href="{% url 'wg_loeschen' %}">WG löschen</a>                     {# Nur für Admins #}
+  {% endif %}
+</div>
 {% endblock %}
