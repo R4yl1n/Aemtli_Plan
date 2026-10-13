@@ -2,8 +2,14 @@
 {% extends "base.html" %}
 {% block title %}Login – Ämtli{% endblock %}
 {% block content %}
-<h1>Login</h1>
-{# form.as_p gibt alle Felder (Benutzername, Passwort) inkl. Fehlermeldungen als Absätze aus #}
-<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Einloggen</button></form>
-<p>Noch kein Konto? <a href="{% url 'register' %}">Registrieren</a></p>
+<div class="card shadow-sm">                                                {# Weisse Karte als Rahmen um das Formular #}
+  <div class="card-body">
+    <h1 class="h3 mb-3">Login</h1>
+    <form method="post">{% csrf_token %}                                    {# csrf_token schützt vor fremden Formularen #}
+      {% include "includes/formular.html" with form=form %}                {# Felder Benutzername und Passwort inkl. Fehlermeldungen #}
+      <button class="btn btn-primary w-100" type="submit">Einloggen</button>  {# w-100 = volle Breite, gut auf dem Handy #}
+    </form>
+    <p class="mt-3 mb-0">Noch kein Konto? <a href="{% url 'register' %}">Registrieren</a></p>
+  </div>
+</div>
 {% endblock %}

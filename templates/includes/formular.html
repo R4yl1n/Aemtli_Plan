@@ -1,0 +1,15 @@
+{# Gemeinsamer Baustein: gibt alle Felder eines Formulars im Bootstrap-Stil aus. #}
+{# Verwendung: {% include "includes/formular.html" with form=mein_formular %} (innerhalb von <form>...</form>) #}
+{% load formular %}                                                        {# Lädt den Filter "bootstrap" aus wg/templatetags/formular.py #}
+{% for fehler in form.non_field_errors %}                                  {# Fehler, die zu keinem einzelnen Feld gehören (z.B. "Passwort falsch") #}
+  <div class="alert alert-danger">{{ fehler }}</div>
+{% endfor %}
+{% for feld in form.hidden_fields %}{{ feld }}{% endfor %}                 {# Versteckte Felder unverändert ausgeben #}
+{% for feld in form.visible_fields %}                                      {# Ein Block pro sichtbarem Feld #}
+  <div class="mb-3">                                                       {# mb-3 = Abstand nach unten #}
+    <label class="form-label" for="{{ feld.id_for_label }}">{{ feld.label }}</label>  {# Beschriftung, Klick setzt den Fokus ins Feld #}
+    {{ feld|bootstrap }}                                                   {# Eingabefeld mit Bootstrap-Klasse #}
+    {% for fehler in feld.errors %}<div class="invalid-feedback">{{ fehler }}</div>{% endfor %}  {# Fehlermeldung unter dem Feld #}
+    {% if feld.help_text %}<div class="form-text">{{ feld.help_text|safe }}</div>{% endif %}  {# Hilfetext, z.B. Passwortregeln (von Django, enthält HTML-Listen) #}
+  </div>
+{% endfor %}

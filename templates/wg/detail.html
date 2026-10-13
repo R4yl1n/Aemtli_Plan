@@ -3,28 +3,38 @@
 {% extends "base.html" %}
 {% block title %}{{ wg.name }} – Ämtli{% endblock %}
 {% block content %}
-<h1>{{ wg.name }}</h1>
-<p>Einladungscode: <code>{{ wg.einladungscode }}</code></p>  {# Diesen Code an neue Mitbewohner weitergeben #}
-{% if ist_admin %}
-{# Neuen Code erzeugen, z.B. wenn der alte an die falsche Person ging #}
-<form method="post" action="{% url 'code_erneuern' %}">{% csrf_token %}<button type="submit">Code erneuern</button></form>
-{% endif %}
+<h1 class="h3 mb-4">{{ wg.name }}</h1>
 
-<h2>Mitglieder</h2>
-<table>
-  <tr><th>Name</th><th>Rolle</th>{% if ist_admin %}<th></th>{% endif %}</tr>
-  {% for m in mitgliedschaften %}                    {# Eine Zeile pro Mitbewohner #}
-  <tr>
-    <td>{{ m.user.username }}</td>
-    <td>{{ m.get_rolle_display }}</td>               {# Zeigt "Admin" bzw. "Mitglied" statt des DB-Werts #}
+<div class="card shadow-sm mb-4">                                           {# Karte mit dem Einladungscode #}
+  <div class="card-body d-flex flex-wrap align-items-center gap-2">         {# flex-wrap = auf dem Handy umbrechen statt überlaufen #}
+    <span>Einladungscode:</span>
+    <code class="fs-5">{{ wg.einladungscode }}</code>                        {# Diesen Code an neue Mitbewohner weitergeben #}
     {% if ist_admin %}
-    <td>
-      {# m.pk = ID der Mitgliedschaft, damit die View weiss, wer gemeint ist #}
-      <form method="post" action="{% url 'rolle_wechseln' m.pk %}" style="display:inline">{% csrf_token %}<button type="submit">Rolle wechseln</button></form>
-      <form method="post" action="{% url 'mitglied_entfernen' m.pk %}" style="display:inline">{% csrf_token %}<button type="submit">Entfernen</button></form>
-    </td>
+    {# Neuen Code erzeugen, z.B. wenn der alte an die falsche Person ging #}
+    <form class="ms-auto" method="post" action="{% url 'code_erneuern' %}">{% csrf_token %}
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Code erneuern</button>
+    </form>
     {% endif %}
-  </tr>
-  {% endfor %}
-</table>
+  </div>
+</div>
+
+<h2 class="h5">Mitglieder</h2>
+<div class="card shadow-sm">
+  <ul class="list-group list-group-flush">                                  {# Liste statt Tabelle: passt besser auf schmale Bildschirme #}
+    {% for m in mitgliedschaften %}                                         {# Eine Zeile pro Mitbewohner #}
+    <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+      <span class="fw-semibold">{{ m.user.username }}</span>
+      {# Rolle als Text-Badge, damit sie auch ohne Farbunterscheidung lesbar ist (Persona Marco) #}
+      <span class="badge {% if m.ist_admin %}text-bg-primary{% else %}text-bg-secondary{% endif %}">{{ m.get_rolle_display }}</span>
+      {% if ist_admin %}
+      <div class="ms-auto d-flex gap-2">                                    {# Verwaltungs-Buttons rechtsbündig #}
+        {# m.pk = ID der Mitgliedschaft, damit die View weiss, wer gemeint ist #}
+        <form method="post" action="{% url 'rolle_wechseln' m.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" type="submit">Rolle wechseln</button></form>
+        <form method="post" action="{% url 'mitglied_entfernen' m.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit">Entfernen</button></form>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
 {% endblock %}

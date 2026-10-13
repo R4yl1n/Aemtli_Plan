@@ -2,13 +2,32 @@
 {% extends "base.html" %}
 {% block title %}WG – Ämtli{% endblock %}
 {% block content %}
-<h1>Willkommen bei Ämtli</h1>
+<h1 class="h3 mb-4">Willkommen bei Ämtli</h1>
 
-<h2>WG erstellen</h2>
-{# Schickt den Namen an wg.views.wg_erstellen #}
-<form method="post" action="{% url 'wg_erstellen' %}">{% csrf_token %}{{ erstellen_form.as_p }}<button type="submit">WG erstellen</button></form>
-
-<h2>Einer WG beitreten</h2>
-{# Schickt den Einladungscode an wg.views.wg_beitreten #}
-<form method="post" action="{% url 'wg_beitreten' %}">{% csrf_token %}{{ beitritt_form.as_p }}<button type="submit">Beitreten</button></form>
+<div class="row g-3">                                                       {# Zwei Karten: nebeneinander am Laptop, untereinander auf dem Handy #}
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">                                      {# h-100 = beide Karten gleich hoch #}
+      <div class="card-body">
+        <h2 class="h5">WG erstellen</h2>
+        {# Schickt den Namen an wg.views.wg_erstellen #}
+        <form method="post" action="{% url 'wg_erstellen' %}">{% csrf_token %}
+          {% include "includes/formular.html" with form=erstellen_form %}
+          <button class="btn btn-primary" type="submit">WG erstellen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h5">Einer WG beitreten</h2>
+        {# Schickt den Einladungscode an wg.views.wg_beitreten #}
+        <form method="post" action="{% url 'wg_beitreten' %}">{% csrf_token %}
+          {% include "includes/formular.html" with form=beitritt_form %}
+          <button class="btn btn-outline-primary" type="submit">Beitreten</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

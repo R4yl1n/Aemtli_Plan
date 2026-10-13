@@ -1,37 +1,54 @@
 {# Grundlayout für alle Seiten. Andere Templates "erben" davon mit {% extends "base.html" %} #}
-{# und füllen nur die Blöcke "title" und "content". #}
+{# und füllen nur die Blöcke "title" und "content". Gestaltung mit Bootstrap 5 (lokal unter static/vendor/). #}
+{% load static %}                                                           {# Ermöglicht {% static '...' %} für CSS/JS-Dateien #}
 <!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">                                                    {# Umlaute korrekt darstellen #}
   <meta name="viewport" content="width=device-width, initial-scale=1">    {# Auf dem Handy richtig skalieren #}
   <title>{% block title %}Ämtli{% endblock %}</title>                      {# Seitentitel, kann pro Seite überschrieben werden #}
-  <style>
-    /* Einfaches Grund-Styling, bis das Frontend festgelegt ist */
-    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 0 auto; padding: 1rem; }  /* Inhalt zentriert, schmale Spalte */
-    nav { display: flex; gap: 1rem; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: .5rem; margin-bottom: 1rem; }  /* Navigationsleiste oben */
-    nav form { display: inline; margin-left: auto; }                         /* Logout-Button ganz rechts */
-    .messages li { background: #eef; padding: .4rem .6rem; margin: .3rem 0; list-style: none; }  /* Meldungen hervorheben */
-    .errorlist { color: #b00; }                                              /* Formularfehler rot */
-    table { border-collapse: collapse; width: 100%; }                        /* Tabellen volle Breite */
-    td, th { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid #eee; }  /* Tabellenzellen */
-  </style>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">  {# Bootstrap-Grundstil #}
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">                {# Eigene Anpassungen, nach Bootstrap geladen damit sie gewinnen #}
 </head>
 <body>
-  <nav>
-    <strong><a href="/">Ämtli</a></strong>                                   {# Logo/Link zur Startseite #}
-    {% if user.is_authenticated %}                                          {# Eingeloggt: #}
-      <a href="{% url 'wg_detail' %}">Meine WG</a>                           {# Link zur eigenen WG #}
-      <form method="post" action="{% url 'logout' %}">{% csrf_token %}       {# Logout muss per POST erfolgen; csrf_token schützt vor fremden Formularen #}
-        <span>{{ user.username }}</span> <button type="submit">Logout</button>
-      </form>
-    {% else %}                                                              {# Nicht eingeloggt: #}
-      <a href="{% url 'login' %}">Login</a>
-      <a href="{% url 'register' %}">Registrieren</a>
-    {% endif %}
+  <nav class="navbar navbar-expand-sm navbar-dark bg-primary mb-4">       {# Navigationsleiste; auf dem Handy zusammengeklappt #}
+    <div class="container">
+      <a class="navbar-brand fw-bold" href="/">Ämtli</a>                    {# Logo/Link zur Startseite #}
+      {# Button mit drei Strichen, nur auf schmalen Bildschirmen sichtbar; klappt das Menü auf/zu #}
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#hauptmenue" aria-controls="hauptmenue" aria-expanded="false" aria-label="Menü öffnen">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="hauptmenue">                 {# Inhalt, der auf dem Handy eingeklappt wird #}
+        {% if user.is_authenticated %}                                      {# Eingeloggt: #}
+          <ul class="navbar-nav me-auto">                                   {# me-auto = Links nach links, Rest nach rechts schieben #}
+            <li class="nav-item"><a class="nav-link" href="{% url 'wg_detail' %}">Meine WG</a></li>  {# Link zur eigenen WG #}
+          </ul>
+          {# Logout muss per POST erfolgen; csrf_token schützt vor fremden Formularen #}
+          <form class="d-flex align-items-center gap-2" method="post" action="{% url 'logout' %}">{% csrf_token %}
+            <span class="navbar-text">{{ user.username }}</span>             {# Angemeldeter Benutzername #}
+            <button class="btn btn-sm btn-outline-light" type="submit">Logout</button>
+          </form>
+        {% else %}                                                          {# Nicht eingeloggt: #}
+          <ul class="navbar-nav ms-auto">                                   {# ms-auto = Links ganz nach rechts #}
+            <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Registrieren</a></li>
+          </ul>
+        {% endif %}
+      </div>
+    </div>
   </nav>
-  {# Meldungen aus messages.success(...) / messages.error(...) in den Views anzeigen #}
-  {% if messages %}<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
-  {% block content %}{% endblock %}                                         {# Hier kommt der Inhalt der jeweiligen Seite hin #}
+
+  <main class="container" style="max-width: 48rem;">                       {# Schmale, zentrierte Inhaltsspalte (gut lesbar, auch am Laptop) #}
+    {# Meldungen aus messages.success(...) / messages.error(...) als Bootstrap-Alerts; m.tags = "success" bzw. "danger" (siehe MESSAGE_TAGS in settings.py) #}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert">
+        {{ m }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schliessen"></button>  {# Meldung wegklicken #}
+      </div>
+    {% endfor %}
+    {% block content %}{% endblock %}                                       {# Hier kommt der Inhalt der jeweiligen Seite hin #}
+  </main>
+
+  <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>  {# Bootstrap-JavaScript: Menü aufklappen, Meldungen schliessen #}
 </body>
 </html>

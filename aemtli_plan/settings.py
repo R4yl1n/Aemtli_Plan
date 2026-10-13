@@ -120,6 +120,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']                  # Projektweite statische Dateien: Bootstrap (lokal, ohne CDN) und eigenes CSS
+
+# Meldungs-Stufen auf Bootstrap-Farben abbilden: messages.error(...) soll als rote "alert-danger" erscheinen
+from django.contrib.messages import constants as message_constants  # Konstanten für die Meldungs-Stufen
+MESSAGE_TAGS = {message_constants.ERROR: 'danger'}        # Django nennt es "error", Bootstrap "danger"
 
 
 # Email
