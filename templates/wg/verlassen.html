@@ -1,0 +1,19 @@
+{# Bestätigungsseite für "WG verlassen" (wg.views.wg_verlassen). Erst der Button unten führt den Austritt aus. #}
+{% extends "base.html" %}
+{% block title %}WG verlassen – Ämtli{% endblock %}
+{% block content %}
+<div class="card shadow-sm border-danger">                                  {# Roter Rahmen: Aktion lässt sich nicht rückgängig machen #}
+  <div class="card-body">
+    <h1 class="h4">«{{ wg.name }}» verlassen?</h1>
+    {% if allein %}                                                         {# Letzte Person: die WG verschwindet ganz #}
+      <p>Du bist die letzte Person in dieser WG. <strong>Wenn du gehst, wird die WG mit allen Daten gelöscht.</strong></p>
+    {% else %}
+      <p>Du bist danach nicht mehr Mitglied. Um wieder beizutreten, brauchst du einen neuen Einladungscode.</p>
+    {% endif %}
+    <form class="d-flex gap-2" method="post">{% csrf_token %}               {# Ohne action: schickt an dieselbe Adresse (POST) #}
+      <button class="btn btn-danger" type="submit">Ja, WG verlassen</button>
+      <a class="btn btn-outline-secondary" href="{% url 'wg_detail' %}">Abbrechen</a>  {# Zurück ohne Änderung #}
+    </form>
+  </div>
+</div>
+{% endblock %}
