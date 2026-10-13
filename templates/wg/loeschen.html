@@ -1,0 +1,17 @@
+{# Bestätigungsseite für "WG löschen" (wg.views.wg_loeschen), nur für Admins. Erst der Button unten löscht. #}
+{% extends "base.html" %}
+{% block title %}WG löschen – Ämtli{% endblock %}
+{% block content %}
+<div class="card shadow-sm border-danger">                                  {# Roter Rahmen: Aktion lässt sich nicht rückgängig machen #}
+  <div class="card-body">
+    <h1 class="h4">«{{ wg.name }}» endgültig löschen?</h1>
+    <p>Die WG und alle ihre Daten werden gelöscht. Das betrifft <strong>{{ anzahl }} Person{{ anzahl|pluralize:"en" }}</strong>.  {# pluralize: "Person" bzw. "Personen" #}
+       Die Benutzerkonten bleiben bestehen. Alle können danach eine neue WG gründen oder einer anderen beitreten.</p>
+    <p class="mb-3"><strong>Das kann nicht rückgängig gemacht werden.</strong></p>
+    <form class="d-flex gap-2" method="post">{% csrf_token %}               {# Ohne action: schickt an dieselbe Adresse (POST) #}
+      <button class="btn btn-danger" type="submit">Ja, WG löschen</button>
+      <a class="btn btn-outline-secondary" href="{% url 'wg_detail' %}">Abbrechen</a>  {# Zurück ohne Änderung #}
+    </form>
+  </div>
+</div>
+{% endblock %}
