@@ -1,6 +1,6 @@
 from django.db import models
 from django.db.models import UniqueConstraint
-from accounts.models import Benutzer  # Cross-App Import
+from django.conf import settings
 from wg.models import WG  # Cross-App Import
 
 class Aemtli(models.Model):
@@ -16,7 +16,7 @@ class Aemtli(models.Model):
 
 class AemtliZuteilung(models.Model):
     aemtli = models.ForeignKey(Aemtli, on_delete=models.CASCADE, related_name='zuteilungen')
-    user = models.ForeignKey(Benutzer, on_delete=models.CASCADE, related_name='aemtli_zuteilungen')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='aemtli_zuteilungen')
     woche_start = models.DateField()
     erledigt_am = models.DateTimeField(blank=True, null=True)
 

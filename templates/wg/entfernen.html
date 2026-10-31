@@ -1,0 +1,16 @@
+{# Bestätigungsseite für "Mitglied entfernen" (wg.views.mitglied_entfernen), nur für Admins. Erst der Button unten entfernt. #}
+{% extends "base.html" %}
+{% block title %}Mitglied entfernen – Ämtli{% endblock %}
+{% block content %}
+<div class="card shadow-sm border-danger">                                  {# Roter Rahmen wie bei "WG verlassen" und "WG löschen" #}
+  <div class="card-body">
+    <h1 class="h4">{{ mitgliedschaft.user.username }} aus «{{ mitgliedschaft.wg.name }}» entfernen?</h1>
+    <p>{{ mitgliedschaft.user.username }} ist danach nicht mehr Mitglied. Bisherige Ämtli und Ausgaben bleiben als Historie erhalten.
+       Mit dem Einladungscode kann die Person wieder beitreten, erneuere den Code bei Bedarf.</p>
+    <form class="d-flex gap-2" method="post">{% csrf_token %}               {# Ohne action: schickt an dieselbe Adresse (POST) #}
+      <button class="btn btn-danger" type="submit">Ja, entfernen</button>
+      <a class="btn btn-outline-secondary" href="{% url 'wg_detail' %}">Abbrechen</a>  {# Zurück ohne Änderung #}
+    </form>
+  </div>
+</div>
+{% endblock %}
