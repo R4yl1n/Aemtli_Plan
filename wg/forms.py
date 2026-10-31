@@ -17,11 +17,15 @@ class BeitrittForm(forms.Form):
     """Formular zum Beitreten einer WG mit einem Einladungscode."""
     code = forms.CharField(label="Einladungscode", max_length=32)  # Eingabefeld für den Code
 
-    def clean_code(self):
-        """Wird von Django automatisch aufgerufen, um das Feld 'code' zu prüfen."""
-        code = self.cleaned_data["code"].strip()          # Eingabe holen und Leerzeichen am Rand entfernen
-        try:
-            self.wg = WG.objects.get(einladungscode=code) # WG mit diesem Code suchen und merken
-        except WG.DoesNotExist:                           # Keine WG gefunden
-            raise forms.ValidationError("Ungültiger Einladungscode.")  # Fehlermeldung beim Feld anzeigen
-        return code                                       # Gültigen Code zurückgeben
+    def clean(self):
+        """Sucht die WG zum Code und legt sie in cleaned_data["wg"] ab.
+        So liefert das Formular alles, was die View braucht, über cleaned_data statt über ein
+        zusätzliches Attribut, das nur nach is_valid() existiert."""
+        cleaned_data = super().clean()
+        code = cleaned_data.get("code")                   # Fehlt, wenn das Feld schon leer/ungültig war
+        if code:                                          # Leerzeichen am Rand entfernt das CharField bereits selbst
+            try:
+                cleaned_data["wg"] = WG.objects.get(einladungscode=code)
+            except WG.DoesNotExist:
+                self.add_error("code", "Ungültiger Einladungscode.")  # Fehler direkt beim Feld anzeigen
+        return cleaned_data

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,10 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-g1a_$qnx5#kiug2o)but-&xtkg1_og1#j4@r8_^*h($6dmw9%v'
+# Aus der Umgebung lesbar, damit ein echter Schlüssel nicht im Repository stehen muss.
+# Der Fallback ist nur für die lokale Entwicklung gedacht.
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", 'django-insecure-g1a_$qnx5#kiug2o)but-&xtkg1_og1#j4@r8_^*h($6dmw9%v')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Standard "1" (an) für lokale Entwicklung; mit DJANGO_DEBUG=0 abschalten.
+DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = []
 
@@ -107,9 +111,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# de-ch: Django liefert Formular- und Validierungsmeldungen (z.B. Passwortregeln) auf Deutsch.
+LANGUAGE_CODE = "de-ch"
 
-TIME_ZONE = 'UTC'
+# Lokale Zeit, damit die wöchentliche Ämtli-Rotation (F2) am Montag 00:00 Schweizer Zeit
+# wechselt und nicht schon am Sonntagabend um 23:00/22:00 (UTC).
+TIME_ZONE = "Europe/Zurich"
 
 USE_I18N = True
 
@@ -135,6 +142,10 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+# Eigenes Benutzer-Modell statt auth.User (siehe accounts/models.py).
+# Muss gesetzt sein, bevor die erste Migration läuft, ein späterer Wechsel geht nur mit neuer DB.
+AUTH_USER_MODEL = 'accounts.Benutzer'
 
 # Login-Einstellungen
 LOGIN_URL = 'login'              # Hierhin werden nicht eingeloggte Benutzer geschickt

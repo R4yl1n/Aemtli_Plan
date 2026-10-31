@@ -26,11 +26,12 @@
       <span class="fw-semibold">{{ m.user.username }}</span>
       {# Rolle als Text-Badge, damit sie auch ohne Farbunterscheidung lesbar ist (Persona Marco) #}
       <span class="badge {% if m.ist_admin %}text-bg-primary{% else %}text-bg-secondary{% endif %}">{{ m.get_rolle_display }}</span>
-      {% if ist_admin %}
+      {# In der eigenen Zeile keine Verwaltungs-Buttons: für sich selbst gibt es unten "WG verlassen" #}
+      {% if ist_admin and m.user != user %}
       <div class="ms-auto d-flex gap-2">                                    {# Verwaltungs-Buttons rechtsbündig #}
         {# m.pk = ID der Mitgliedschaft, damit die View weiss, wer gemeint ist #}
         <form method="post" action="{% url 'rolle_wechseln' m.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" type="submit">Rolle wechseln</button></form>
-        <form method="post" action="{% url 'mitglied_entfernen' m.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" type="submit">Entfernen</button></form>
+        <a class="btn btn-sm btn-outline-danger" href="{% url 'mitglied_entfernen' m.pk %}">Entfernen</a>  {# Führt zuerst auf eine Bestätigungsseite #}
       </div>
       {% endif %}
     </li>
@@ -38,7 +39,7 @@
   </ul>
 </div>
 
-{# Aktionen, die sich nicht rückgängig machen lassen. Beide Links führen zuerst auf eine Bestätigungsseite. #}
+{# Folgenreiche Aktionen. Beide Links führen zuerst auf eine Bestätigungsseite. #}
 <div class="d-flex flex-wrap gap-2 mt-4">
   <a class="btn btn-outline-danger" href="{% url 'wg_verlassen' %}">WG verlassen</a>          {# Für alle Mitglieder #}
   {% if ist_admin %}
