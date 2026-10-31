@@ -5,8 +5,8 @@
 <div class="card shadow-sm border-danger">                                  {# Roter Rahmen: Aktion lässt sich nicht rückgängig machen #}
   <div class="card-body">
     <h1 class="h4">«{{ wg.name }}» verlassen?</h1>
-    {% if allein %}                                                         {# Letzte Person: die WG verschwindet ganz #}
-      <p>Du bist die letzte Person in dieser WG. <strong>Wenn du gehst, wird die WG mit allen Daten gelöscht.</strong></p>
+    {% if allein %}                                                         {# Letzte Person: WG bleibt bestehen, hat danach aber niemanden mehr #}
+      <p>Du bist die letzte Person in dieser WG. Die WG bleibt mit ihrer Historie gespeichert, hat danach aber keine aktiven Mitglieder mehr. Der Einladungscode wird ungültig, niemand kann mehr beitreten.</p>
     {% else %}
       <p>Du bist danach nicht mehr Mitglied. Um wieder beizutreten, brauchst du einen neuen Einladungscode.</p>
     {% endif %}

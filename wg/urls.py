@@ -11,7 +11,7 @@ urlpatterns = [
     path("wg/erstellen/", views.wg_erstellen, name="wg_erstellen"),          # Formular "WG erstellen" absenden
     path("wg/beitreten/", views.wg_beitreten, name="wg_beitreten"),          # Formular "Beitreten" absenden
     path("wg/", views.wg_detail, name="wg_detail"),                          # Übersicht der eigenen WG
-    path("wg/mitglied/<int:pk>/entfernen/", views.mitglied_entfernen, name="mitglied_entfernen"),  # Mitglied entfernen (pk = ID der Mitgliedschaft)
+    path("wg/mitglied/<int:pk>/entfernen/", views.mitglied_entfernen, name="mitglied_entfernen"),  # Mitglied entfernen, mit Bestätigung (pk = ID der Mitgliedschaft)
     path("wg/mitglied/<int:pk>/rolle/", views.rolle_wechseln, name="rolle_wechseln"),              # Rolle wechseln
     path("wg/code-erneuern/", views.code_erneuern, name="code_erneuern"),    # Neuen Einladungscode erzeugen
     path("wg/verlassen/", views.wg_verlassen, name="wg_verlassen"),          # Selbst austreten (mit Bestätigung)

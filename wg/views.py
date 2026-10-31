@@ -1,35 +1,35 @@
-# Views der App "wg". Eine View nimmt eine Anfrage (request) entgegen und gibt eine Antwort zurück
-# (eine HTML-Seite oder eine Weiterleitung).
+# Views der App "wg": WG erstellen, beitreten, verwalten, verlassen und löschen (Feature F1).
 
-from django.contrib import messages                       # Kurze Meldungen oben auf der Seite ("WG erstellt.")
-from django.contrib.auth.decorators import login_required # Nur für eingeloggte Benutzer
-from django.shortcuts import get_object_or_404, redirect, render  # Objekt holen oder 404 / weiterleiten / Seite anzeigen
-from django.views.decorators.http import require_POST     # Erlaubt nur POST (Formular-Absenden), sonst Fehler 405
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from .forms import BeitrittForm, WGForm                   # Unsere Formulare aus wg/forms.py
-from .models import Mitgliedschaft, WG, neuer_einladungscode  # Modelle und Code-Generator aus wg/models.py
-from .permissions import nur_wg_admin, nur_wg_mitglied    # Zugriffsschutz aus wg/permissions.py
+from .forms import BeitrittForm, WGForm
+from .models import Mitgliedschaft, WG, neuer_einladungscode
+from .permissions import nur_wg_admin, nur_wg_mitglied
 
 
 def _hat_wg(user):
-    """Hilfsfunktion: True, wenn der Benutzer schon in einer WG ist."""
-    return Mitgliedschaft.objects.filter(user=user).exists()
+    """True, wenn der Benutzer eine aktive Mitgliedschaft hat. Ausgetretene zählen nicht."""
+    return Mitgliedschaft.objects.aktive().filter(user=user).exists()
 
 
 @login_required
 def home(request):
-    """Startseite "/": leitet je nach Situation weiter."""
-    if _hat_wg(request.user):                             # Schon in einer WG?
-        return redirect("wg_detail")                      # -> WG-Übersicht
-    return redirect("wg_start")                           # Sonst -> WG erstellen oder beitreten
+    """Startseite "/": mit WG zur Übersicht, ohne WG zu "erstellen oder beitreten"."""
+    if _hat_wg(request.user):
+        return redirect("wg_detail")
+    return redirect("wg_start")
 
 
 @login_required
 def wg_start(request):
     """Seite für Benutzer ohne WG: zeigt die Formulare "WG erstellen" und "Beitreten"."""
-    if _hat_wg(request.user):                             # Wer schon eine WG hat, braucht diese Seite nicht
+    if _hat_wg(request.user):
         return redirect("wg_detail")
-    return render(request, "wg/start.html", {             # Seite mit zwei leeren Formularen anzeigen
+    return render(request, "wg/start.html", {
         "erstellen_form": WGForm(),
         "beitritt_form": BeitrittForm(),
     })
@@ -39,17 +39,22 @@ def wg_start(request):
 @require_POST
 def wg_erstellen(request):
     """Legt eine neue WG an. Der Ersteller wird automatisch Admin."""
-    if _hat_wg(request.user):                             # Nur eine WG pro Benutzer erlaubt
+    if _hat_wg(request.user):                             # Höchstens eine aktive WG pro Benutzer
         return redirect("wg_detail")
-    form = WGForm(request.POST)                           # Formular mit den eingegebenen Daten füllen
-    if form.is_valid():                                   # Name vorhanden und nicht zu lang?
-        wg = form.save()                                  # WG speichern (Einladungscode wird automatisch erzeugt)
-        Mitgliedschaft.objects.create(                    # Ersteller als Mitglied eintragen ...
-            user=request.user, wg=wg, rolle=Mitgliedschaft.ADMIN,  # ... und zwar als Admin
-        )
-        messages.success(request, f"WG «{wg.name}» erstellt.")    # Erfolgsmeldung
-        return redirect("wg_detail")                      # Weiter zur WG-Übersicht
-    return render(request, "wg/start.html", {             # Fehler: Seite nochmal mit Fehlermeldungen zeigen
+    form = WGForm(request.POST)
+    if form.is_valid():
+        # WG und Admin-Mitgliedschaft gehören zusammen: entweder beide gespeichert oder keine.
+        # Bei einem Doppelklick bestehen beide Requests _hat_wg(); der zweite scheitert erst am
+        # UniqueConstraint. Ohne atomic() bliebe dann eine WG ohne Mitglieder zurück.
+        try:
+            with transaction.atomic():
+                wg = form.save()
+                Mitgliedschaft.objects.create(user=request.user, wg=wg, rolle=Mitgliedschaft.ADMIN)
+        except IntegrityError:                            # Benutzer hat inzwischen schon eine aktive WG
+            return redirect("wg_detail")
+        messages.success(request, f"WG «{wg.name}» erstellt.")
+        return redirect("wg_detail")
+    return render(request, "wg/start.html", {             # Mit Fehlermeldungen erneut anzeigen
         "erstellen_form": form,
         "beitritt_form": BeitrittForm(),
     })
@@ -59,14 +64,21 @@ def wg_erstellen(request):
 @require_POST
 def wg_beitreten(request):
     """Tritt einer bestehenden WG mit dem Einladungscode bei."""
-    if _hat_wg(request.user):                             # Nur eine WG pro Benutzer erlaubt
+    if _hat_wg(request.user):                             # Höchstens eine aktive WG pro Benutzer
         return redirect("wg_detail")
-    form = BeitrittForm(request.POST)                     # Formular mit dem eingegebenen Code füllen
-    if form.is_valid():                                   # Code gültig? (Prüfung in BeitrittForm.clean_code)
-        Mitgliedschaft.objects.create(user=request.user, wg=form.wg)    # Als normales Mitglied eintragen
-        messages.success(request, f"Du bist «{form.wg.name}» beigetreten.")  # Erfolgsmeldung
-        return redirect("wg_detail")                      # Weiter zur WG-Übersicht
-    return render(request, "wg/start.html", {             # Ungültiger Code: Seite mit Fehlermeldung zeigen
+    form = BeitrittForm(request.POST)
+    if form.is_valid():                                   # Code-Prüfung in BeitrittForm.clean
+        wg = form.cleaned_data["wg"]
+        # Gleicher Schutz wie bei wg_erstellen. atomic() setzt einen Savepoint, damit ein
+        # IntegrityError die umgebende DB-Transaktion nicht unbrauchbar macht.
+        try:
+            with transaction.atomic():
+                Mitgliedschaft.objects.create(user=request.user, wg=wg)
+        except IntegrityError:                            # Benutzer hat inzwischen schon eine aktive WG
+            return redirect("wg_detail")
+        messages.success(request, f"Du bist «{wg.name}» beigetreten.")
+        return redirect("wg_detail")
+    return render(request, "wg/start.html", {             # Mit Fehlermeldung erneut anzeigen
         "erstellen_form": WGForm(),
         "beitritt_form": form,
     })
@@ -74,88 +86,97 @@ def wg_beitreten(request):
 
 @nur_wg_mitglied
 def wg_detail(request):
-    """Übersicht der eigenen WG: Name, Einladungscode, Mitgliederliste."""
+    """Übersicht der eigenen WG: Name, Einladungscode, aktive Mitglieder."""
     return render(request, "wg/detail.html", {
-        "wg": request.wg,                                 # Die eigene WG (gesetzt von @nur_wg_mitglied)
-        "mitgliedschaften": request.wg.mitgliedschaften.select_related("user"),  # Alle Mitglieder inkl. Benutzerdaten in einer Abfrage
-        "ist_admin": request.mitgliedschaft.ist_admin,    # Steuert, ob Verwaltungs-Buttons angezeigt werden
+        "wg": request.wg,
+        "mitgliedschaften": request.wg.mitglieder.aktive().select_related("user"),  # select_related: Benutzernamen ohne Zusatzabfrage pro Zeile
+        "ist_admin": request.mitgliedschaft.ist_admin,    # Nur für die Anzeige der Buttons, die Views prüfen selbst
     })
 
 
 def _letzter_admin(m):
-    """True, wenn m der einzige Admin der WG ist. Dann darf m weder entfernt noch herabgestuft werden,
-    sonst könnte niemand mehr die WG verwalten."""
-    return m.ist_admin and m.wg.mitgliedschaften.filter(rolle=Mitgliedschaft.ADMIN).count() == 1
+    """True, wenn m der einzige aktive Admin der WG ist. Dann darf m weder entfernt noch herabgestuft
+    werden, sonst könnte niemand mehr die WG verwalten."""
+    return m.ist_admin and m.wg.mitglieder.aktive().filter(rolle=Mitgliedschaft.ADMIN).count() == 1
 
 
 @nur_wg_admin
-@require_POST
 def mitglied_entfernen(request, pk):
-    """Admin entfernt ein Mitglied aus der WG."""
-    m = get_object_or_404(Mitgliedschaft, pk=pk, wg=request.wg)  # Nur Mitglieder der eigenen WG, sonst 404
-    if _letzter_admin(m):                                 # Letzten Admin schützen
+    """Admin entfernt ein Mitglied aus der WG. GET zeigt eine Bestätigungsseite, POST führt es aus."""
+    # Filter auf die eigene WG: Fremde oder bereits ausgetretene Mitgliedschaften ergeben 404
+    m = get_object_or_404(Mitgliedschaft.objects.aktive(), pk=pk, wg=request.wg)
+    if _letzter_admin(m):
         messages.error(request, "Der letzte Admin kann nicht entfernt werden.")
+    elif request.method != "POST":                        # GET ändert nie etwas, sondern fragt nur nach
+        return render(request, "wg/entfernen.html", {"mitgliedschaft": m})
     else:
-        m.delete()                                        # Mitgliedschaft löschen (Benutzerkonto bleibt bestehen)
+        m.austreten()                                     # Austritt statt Löschen, damit die Historie erhalten bleibt
         messages.success(request, f"{m.user.username} wurde entfernt.")
-    return redirect("wg_detail")                          # Zurück zur WG-Übersicht
+    return redirect("wg_detail")
 
 
 @nur_wg_admin
 @require_POST
 def rolle_wechseln(request, pk):
     """Admin wechselt die Rolle eines Mitglieds: Mitglied <-> Admin."""
-    m = get_object_or_404(Mitgliedschaft, pk=pk, wg=request.wg)  # Nur Mitglieder der eigenen WG, sonst 404
-    if _letzter_admin(m):                                 # Letzten Admin nicht herabstufen
+    # Filter auf die eigene WG: Fremde oder bereits ausgetretene Mitgliedschaften ergeben 404
+    m = get_object_or_404(Mitgliedschaft.objects.aktive(), pk=pk, wg=request.wg)
+    if _letzter_admin(m):
         messages.error(request, "Es muss mindestens ein Admin bleiben.")
     else:
-        m.rolle = Mitgliedschaft.MITGLIED if m.ist_admin else Mitgliedschaft.ADMIN  # Rolle umdrehen
-        m.save()                                          # Änderung speichern
-    return redirect("wg_detail")                          # Zurück zur WG-Übersicht
+        m.rolle = Mitgliedschaft.MITGLIED if m.ist_admin else Mitgliedschaft.ADMIN
+        m.save()
+    return redirect("wg_detail")
 
 
 @nur_wg_mitglied
 def wg_verlassen(request):
     """Mitglied verlässt die WG selbst. GET zeigt eine Bestätigungsseite, POST führt den Austritt aus."""
-    m = request.mitgliedschaft                            # Eigene Mitgliedschaft (gesetzt von @nur_wg_mitglied)
-    allein = request.wg.mitgliedschaften.count() == 1     # True, wenn niemand sonst mehr in der WG ist
-    if not allein and _letzter_admin(m):                  # Einziger Admin, aber es gibt noch andere Mitglieder?
-        messages.error(request, "Gib zuerst einer anderen Person die Admin-Rolle, bevor du die WG verlässt.")
-        return redirect("wg_detail")                      # Zurück, ohne etwas zu ändern
-    if request.method != "POST":                          # Seite nur aufgerufen (GET)
-        return render(request, "wg/verlassen.html", {     # -> Bestätigungsseite anzeigen
+    m = request.mitgliedschaft
+    allein = request.wg.mitglieder.aktive().count() == 1
+    # Der einzige Admin darf nur gehen, wenn sonst niemand mehr da ist, sonst bliebe die WG unverwaltbar
+    if not allein and _letzter_admin(m):
+        messages.error(request, "Bitte zuerst ein anderes Mitglied zum Admin machen.")
+        return redirect("wg_detail")
+    if request.method != "POST":                          # GET ändert nie etwas, sondern fragt nur nach
+        return render(request, "wg/verlassen.html", {
             "wg": request.wg,
-            "allein": allein,                             # Steuert den Hinweis "die WG wird gelöscht"
+            "allein": allein,                             # Hinweis, dass die WG danach keine aktiven Mitglieder mehr hat
         })
-    name = request.wg.name                                # Name merken, bevor die Daten weg sind
-    if allein:                                            # Letzte Person geht?
-        request.wg.delete()                               # -> ganze WG löschen (Mitgliedschaften werden mitgelöscht)
-        messages.success(request, f"Du hast «{name}» verlassen. Die WG wurde gelöscht, weil niemand mehr darin war.")
-    else:
-        m.delete()                                        # Nur die eigene Mitgliedschaft löschen, das Konto bleibt
-        messages.success(request, f"Du hast «{name}» verlassen.")
-    return redirect("wg_start")                           # Weiter zu "WG gründen oder beitreten"
+    # Auch die letzte Person tritt nur aus: Die WG bleibt ohne aktive Mitglieder bestehen, damit
+    # Ämtli- und Ausgaben-Historie nicht per CASCADE verloren geht. Hart löscht nur "WG löschen".
+    with transaction.atomic():
+        m.austreten()
+        if allein:
+            # Leere WG schliessen: Mit einem alten Code soll niemand die Historie einer aufgelösten
+            # WG sehen können. Den Code ersetzen statt leeren, weil das Feld unique ist.
+            request.wg.einladungscode = neuer_einladungscode()
+            request.wg.save(update_fields=["einladungscode"])
+    messages.success(request, f"Du hast «{request.wg.name}» verlassen.")
+    return redirect("wg_start")
 
 
 @nur_wg_admin
 def wg_loeschen(request):
     """Admin löscht die ganze WG. GET zeigt eine Bestätigungsseite, POST löscht."""
-    if request.method != "POST":                          # Seite nur aufgerufen (GET)
-        return render(request, "wg/loeschen.html", {      # -> Bestätigungsseite anzeigen
+    if request.method != "POST":                          # GET ändert nie etwas, sondern fragt nur nach
+        return render(request, "wg/loeschen.html", {
             "wg": request.wg,
-            "anzahl": request.wg.mitgliedschaften.count(),  # Wie viele Personen betroffen sind
+            "anzahl": request.wg.mitglieder.aktive().count(),
         })
-    name = request.wg.name                                # Name merken, bevor die Daten weg sind
-    request.wg.delete()                                   # WG löschen; alle Mitgliedschaften werden mitgelöscht, Konten bleiben
+    name = request.wg.name                                # Merken, bevor das Objekt gelöscht ist
+    # Bewusst hartes Löschen: einzige Stelle, an der Historie verschwindet. Benutzerkonten bleiben bestehen.
+    request.wg.delete()
     messages.success(request, f"Die WG «{name}» wurde gelöscht.")
-    return redirect("wg_start")                           # Weiter zu "WG gründen oder beitreten"
+    return redirect("wg_start")
 
 
 @nur_wg_admin
 @require_POST
 def code_erneuern(request):
-    """Admin erzeugt einen neuen Einladungscode. Der alte Code funktioniert danach nicht mehr."""
-    request.wg.einladungscode = neuer_einladungscode()    # Neuen Zufallscode setzen
-    request.wg.save()                                     # Speichern
+    """Admin erzeugt einen neuen Einladungscode. Der alte Code funktioniert danach nicht mehr,
+    z.B. wenn er an die falsche Person ging."""
+    request.wg.einladungscode = neuer_einladungscode()
+    request.wg.save()
     messages.success(request, "Neuer Einladungscode erzeugt.")
-    return redirect("wg_detail")                          # Zurück zur WG-Übersicht
+    return redirect("wg_detail")
