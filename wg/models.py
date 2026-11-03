@@ -1,57 +1,78 @@
 # Datenmodelle der App "wg": die WG selbst und wer darin Mitglied ist.
-# Jede Klasse hier wird von Django zu einer Tabelle in der Datenbank.
 
-import secrets                                            # Python-Modul für sichere Zufallswerte (für den Einladungscode)
+import uuid
 
-from django.conf import settings                          # Zugriff auf settings.py (für AUTH_USER_MODEL)
-from django.db import models                              # Basis für alle Django-Modelle und Feldtypen
+from django.conf import settings
+from django.db import models
+from django.db.models import Q, UniqueConstraint
+from django.utils import timezone
 
 
 def neuer_einladungscode():
-    """Erzeugt einen zufälligen, schwer erratbaren Code wie 'aZ3k_9Qp1xY'."""
-    return secrets.token_urlsafe(8)                       # 8 Zufalls-Bytes -> ca. 11 Zeichen, URL-tauglich
+    """Zufälliger 32-stelliger Code. uuid4 ist zufällig genug, dass man ihn nicht erraten kann."""
+    return uuid.uuid4().hex
 
 
 class WG(models.Model):
     """Eine Wohngemeinschaft."""
-    name = models.CharField(max_length=100)               # Name der WG, z.B. "WG Seeblick" (Pflichtfeld)
-    einladungscode = models.CharField(                    # Code, mit dem neue Mitbewohner beitreten
-        max_length=32,                                    # maximal 32 Zeichen
-        unique=True,                                      # darf nur bei einer WG vorkommen
-        default=neuer_einladungscode,                     # wird beim Erstellen automatisch erzeugt
-    )
-    erstellt_am = models.DateTimeField(auto_now_add=True) # Zeitpunkt der Erstellung, wird automatisch gesetzt
+    name = models.CharField(max_length=100)
+    einladungscode = models.CharField(max_length=32, unique=True, default=neuer_einladungscode)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name                                  # So wird die WG als Text angezeigt (z.B. in der Shell)
+        return self.name
+
+
+class MitgliedschaftQuerySet(models.QuerySet):
+    def aktive(self):
+        """Nur Mitgliedschaften, die nicht beendet sind. Fast jede Abfrage braucht diesen Filter,
+        weil ausgetretene Mitglieder für Historie (Ämtli, Ausgaben) in der DB bleiben."""
+        return self.filter(ausgetreten_am__isnull=True)
 
 
 class Mitgliedschaft(models.Model):
-    """Verbindet einen Benutzer mit einer WG und legt seine Rolle fest."""
-    ADMIN = "admin"                                       # Wert für die Admin-Rolle (darf verwalten)
-    MITGLIED = "mitglied"                                 # Wert für normale Mitbewohner
-    ROLLEN = [(ADMIN, "Admin"), (MITGLIED, "Mitglied")]   # Auswahl: (Wert in der DB, Anzeigename)
+    """Verbindet einen Benutzer mit einer WG und legt seine Rolle fest.
 
-    user = models.OneToOneField(                          # OneToOne = ein Benutzer gehört zu genau einer WG
-        settings.AUTH_USER_MODEL,                         # verweist auf Djangos Benutzer-Tabelle
-        on_delete=models.CASCADE,                         # wird der Benutzer gelöscht, verschwindet auch die Mitgliedschaft
-        related_name="mitgliedschaft",                    # erlaubt user.mitgliedschaft im Code
-    )
-    wg = models.ForeignKey(                               # ForeignKey = viele Mitgliedschaften gehören zu einer WG
-        WG,                                               # verweist auf die WG-Tabelle
-        on_delete=models.CASCADE,                         # wird die WG gelöscht, verschwinden alle Mitgliedschaften
-        related_name="mitgliedschaften",                  # erlaubt wg.mitgliedschaften.all() im Code
-    )
-    rolle = models.CharField(max_length=10, choices=ROLLEN, default=MITGLIED)  # Rolle, standardmässig "Mitglied"
-    beigetreten_am = models.DateTimeField(auto_now_add=True)                   # Zeitpunkt des Beitritts, automatisch
+    Beim Austritt wird die Zeile nicht gelöscht, sondern ausgetreten_am gesetzt. So bleiben
+    vergangene Ämtli-Zuteilungen und Ausgaben einer Person zuordenbar.
+    """
+
+    class Rolle(models.TextChoices):
+        ADMIN = "admin", "Admin"
+        MITGLIED = "mitglied", "Mitglied"
+
+    # Kurzformen, damit Views und Tests Mitgliedschaft.ADMIN statt Mitgliedschaft.Rolle.ADMIN schreiben können
+    ADMIN = Rolle.ADMIN
+    MITGLIED = Rolle.MITGLIED
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mitgliedschaften")
+    wg = models.ForeignKey(WG, on_delete=models.CASCADE, related_name="mitglieder")
+    rolle = models.CharField(max_length=10, choices=Rolle.choices, default=Rolle.MITGLIED)
+    beigetreten_am = models.DateTimeField(auto_now_add=True)
+    ausgetreten_am = models.DateTimeField(blank=True, null=True)  # NULL = Mitgliedschaft ist aktiv
+
+    objects = MitgliedschaftQuerySet.as_manager()
 
     class Meta:
-        ordering = ["beigetreten_am"]                     # Mitglieder immer in Beitrittsreihenfolge sortieren
+        ordering = ["beigetreten_am"]  # Mitgliederliste in Beitrittsreihenfolge, unabhängig von der DB
+        constraints = [
+            # Regel "ein Benutzer, höchstens eine aktive WG" auf DB-Ebene. Eine Prüfung nur in der View
+            # reicht nicht: zwei gleichzeitige Requests (Doppelklick) bestehen sie beide.
+            UniqueConstraint(
+                fields=["user"],
+                condition=Q(ausgetreten_am__isnull=True),
+                name="unique_active_user_membership",
+            ),
+        ]
 
     @property
     def ist_admin(self):
-        """True, wenn diese Person Admin der WG ist. Aufruf ohne Klammern: m.ist_admin"""
         return self.rolle == self.ADMIN
 
+    def austreten(self):
+        """Beendet die Mitgliedschaft, ohne die Zeile zu löschen (Historie bleibt erhalten)."""
+        self.ausgetreten_am = timezone.now()
+        self.save(update_fields=["ausgetreten_am"])
+
     def __str__(self):
-        return f"{self.user} in {self.wg}"                # Textanzeige, z.B. "lena in WG Seeblick"
+        return f"{self.user} in {self.wg}"
