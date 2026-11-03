@@ -1,6 +1,8 @@
 # Datenmodelle der App "wg": die WG selbst und wer darin Mitglied ist.
 
+import random
 import uuid
+import string
 
 from django.conf import settings
 from django.db import models
@@ -10,7 +12,7 @@ from django.utils import timezone
 
 def neuer_einladungscode():
     """Zufälliger 32-stelliger Code. uuid4 ist zufällig genug, dass man ihn nicht erraten kann."""
-    return uuid.uuid4().hex
+    return  ''.join(random.choices(string.ascii_letters + string.digits, k=8))
 
 
 class WG(models.Model):
